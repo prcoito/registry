@@ -10,7 +10,7 @@ This lib pretends to offer an alternative to the golang's sys/windows/registry m
 
 
 ## Project status
-Currently this project is still on initial faze. Accessing keys, subkeys and values is possible (read only).
+Currently this project is still on initial phase. Accessing keys, subkeys and values is possible (read only).
 There is work to be done in error handling and optimizations to be done.
 
 ## Thanks
