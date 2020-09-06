@@ -7,6 +7,8 @@ import (
 )
 
 type valueKey struct {
+	rws io.ReadWriteSeeker
+
 	binOffset   int64  // hive bin offset
 	valueOffset uint32 // offset of the value relative to binOffset
 
@@ -32,7 +34,17 @@ type valueKey struct {
 	data interface{}
 }
 
-func (vk *valueKey) Read(r io.ReadSeeker) error {
+func newValueKey(rws io.ReadWriteSeeker, binOffset int64, valueOffset uint32) *valueKey {
+	return &valueKey{
+		binOffset:   binOffset,
+		valueOffset: valueOffset,
+		rws:         rws,
+	}
+}
+
+func (vk *valueKey) Read() error {
+	r := vk.rws
+
 	_, err := r.Seek(vk.binOffset+int64(vk.valueOffset), 0)
 	if err != nil {
 		return err
@@ -111,7 +123,7 @@ func (vk *valueKey) Read(r io.ReadSeeker) error {
 	return vk.validate()
 }
 
-func (vk valueKey) validate() error {
+func (vk *valueKey) validate() error {
 	if vk.signature != valueKeySig {
 		return ErrBadSignature
 	}

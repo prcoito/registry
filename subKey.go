@@ -7,15 +7,24 @@ import (
 )
 
 type subKeyList struct {
-	readSeeker io.ReadSeeker
+	rws io.ReadWriteSeeker
 
 	binOffset int64
+	fpOffset  int64
 
 	signature string // must be one of ["lf", "lh", "li", "ri"]
 
 	numberElements uint16
 
 	elements []*subKeyElement
+}
+
+func newSubKeyList(rws io.ReadWriteSeeker, binOffset, fpOffset int64) *subKeyList {
+	return &subKeyList{
+		rws:       rws,
+		binOffset: binOffset,
+		fpOffset:  fpOffset,
+	}
 }
 
 func (skl *subKeyList) validate() error {
@@ -29,7 +38,14 @@ func (skl *subKeyList) validate() error {
 	return nil
 }
 
-func (skl *subKeyList) Read(r io.ReadSeeker) (err error) {
+func (skl *subKeyList) Read() (err error) {
+	r := skl.rws
+
+	_, err = r.Seek(skl.fpOffset, 0)
+	if err != nil {
+		return err
+	}
+
 	b := make([]byte, 2)
 	_, err = r.Read(b)
 	if err != nil {
@@ -45,8 +61,8 @@ func (skl *subKeyList) Read(r io.ReadSeeker) (err error) {
 	skl.numberElements = binary.LittleEndian.Uint16(b)
 
 	for i := uint16(0); i < skl.numberElements; i++ {
-		el := newSubKeyElement(skl.binOffset, skl.binOffset, skl.signature)
-		err = el.Read(r)
+		el := newSubKeyElement(r, skl.binOffset, skl.binOffset, skl.signature)
+		err = el.Read()
 		if err != nil {
 			return err
 		}
@@ -68,14 +84,14 @@ func (skl *subKeyList) subkeyNames(n int) (names []string, err error) {
 	k := 0
 	for i := 0; i < n; i++ {
 		el := skl.elements[k]
-		err := el.ReadElement(skl.readSeeker)
+		err := el.ReadElement()
 		if err != nil {
 			return nil, err
 		}
 		if el.namedKey != nil {
 			names[i] = el.namedKey.name
 		} else if el.subKeyList != nil {
-			el.subKeyList.readSeeker = skl.readSeeker
+			el.subKeyList.rws = skl.rws
 			nms, err := el.subKeyList.subkeyNames(max - i)
 			if err != nil {
 				return nil, err
@@ -90,19 +106,30 @@ func (skl *subKeyList) subkeyNames(n int) (names []string, err error) {
 	return names, nil
 }
 
-func (skl *subKeyList) allElements() (el []*subKeyElement) {
+func (skl *subKeyList) allElements() (el []*subKeyElement, err error) {
+	var els []*subKeyElement
+
 	for _, e := range skl.elements {
-		e.ReadElement(skl.readSeeker)
+		err = e.ReadElement()
+		if err != nil {
+			return
+		}
 		el = append(el, e)
+
 		if e.subKeyList != nil {
-			e.subKeyList.readSeeker = skl.readSeeker
-			el = append(el, e.subKeyList.allElements()...)
+			e.subKeyList.rws = skl.rws
+			els, err = e.subKeyList.allElements()
+			if err != nil {
+				return
+			}
+			el = append(el, els...)
 		}
 	}
 	return
 }
 
 type subKeyElement struct {
+	rws            io.ReadWriteSeeker
 	binOffset      int64
 	hiveDataOffset int64
 
@@ -116,38 +143,50 @@ type subKeyElement struct {
 	subKeyList       *subKeyList
 }
 
-func newSubKeyElement(binOffset, dataOffset int64, sig string) *subKeyElement {
+func newSubKeyElement(rws io.ReadWriteSeeker, binOffset, dataOffset int64, sig string) *subKeyElement {
 	return &subKeyElement{
+		rws:            rws,
 		binOffset:      binOffset,
 		hiveDataOffset: dataOffset,
 		signature:      sig,
 	}
 }
 
-func (el *subKeyElement) Read(r io.ReadSeeker) error {
+func (el *subKeyElement) Read() error {
+	r := el.rws
+
 	buf := make([]byte, 4)
-	r.Read(buf)
+	_, err := r.Read(buf)
+	if err != nil {
+		return err
+	}
+
 	switch el.signature {
 	case "lf", "lh":
 		el.namedKeyOffset = binary.LittleEndian.Uint32(buf)
-		r.Read(buf)
+		_, err := r.Read(buf)
+		if err != nil {
+			return err
+		}
 		el.hashValue = binary.LittleEndian.Uint32(buf)
 	case "li":
 		el.namedKeyOffset = binary.LittleEndian.Uint32(buf)
 	case "ri":
 		el.subKeyListOffset = binary.LittleEndian.Uint32(buf)
 	}
-
 	// fmt.Printf("subKeyElement: %+v\n", el)
 	return nil
 }
 
-func (el *subKeyElement) ReadElement(r io.ReadSeeker) error {
+func (el *subKeyElement) ReadElement() error {
 	switch el.signature {
 	case "lf", "lh":
-		r.Seek(el.hiveDataOffset+int64(el.namedKeyOffset), 0)
-		el.namedKey = &namedKey{}
-		err := el.namedKey.Read(r)
+		el.namedKey = newNamedKey(
+			el.rws,
+			el.binOffset,
+			el.hiveDataOffset+int64(el.namedKeyOffset),
+		)
+		err := el.namedKey.Read()
 		if err != nil {
 			return err
 		}
@@ -156,9 +195,12 @@ func (el *subKeyElement) ReadElement(r io.ReadSeeker) error {
 			return errors.New("Element hash invalid")
 		}
 	case "ri":
-		r.Seek(el.hiveDataOffset+int64(el.subKeyListOffset), 0)
-		el.subKeyList = &subKeyList{binOffset: el.binOffset}
-		err := el.subKeyList.Read(r)
+		el.subKeyList = newSubKeyList(
+			el.rws,
+			el.binOffset,
+			el.hiveDataOffset+int64(el.subKeyListOffset),
+		)
+		err := el.subKeyList.Read()
 		if err != nil {
 			return err
 		}

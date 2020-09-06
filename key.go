@@ -3,6 +3,7 @@ package registry
 import (
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 )
@@ -11,7 +12,17 @@ import (
 type Key struct {
 	nk *namedKey
 
+	rws io.ReadWriteSeeker
+
 	registry Registry
+}
+
+func newKey(r Registry, rws io.ReadWriteSeeker, nk *namedKey) Key {
+	return Key{
+		registry: r,
+		rws:      rws,
+		nk:       nk,
+	}
 }
 
 // OpenSubKey opens the subkey located at path
@@ -20,6 +31,7 @@ func (k Key) OpenSubKey(path string) (Key, error) {
 		return Key{}, fmt.Errorf("Key %s does not have subkeys", k.nk.name)
 	}
 
+	path = strings.Trim(path, string(separator))
 	return k.openSubKey(strings.Split(path, string(separator)))
 }
 
@@ -38,12 +50,23 @@ func (k Key) openSubKey(entries []string) (Key, error) {
 		return Key{}, err
 	}
 	hash := lhSubKeyHash(entries[0])
-	for _, sk := range list.allElements() {
+	els, err := list.allElements()
+	if err != nil {
+		return Key{}, err
+	}
+
+	for _, sk := range els {
 		if sk.hashValue == hash {
-			newKey := Key{registry: k.registry, nk: &namedKey{binOffset: k.nk.binOffset}}
-			k.nk.readSeeker.Seek(list.binOffset+int64(sk.namedKeyOffset), 0)
-			newKey.nk.Read(k.nk.readSeeker)
-			return newKey.openSubKey(entries[1:])
+			nKey := newKey(
+				k.registry,
+				k.rws,
+				newNamedKey(k.rws, k.nk.binOffset, list.binOffset+int64(sk.namedKeyOffset)),
+			)
+			err := nKey.nk.Read()
+			if err != nil {
+				return Key{}, err
+			}
+			return nKey.openSubKey(entries[1:])
 		}
 	}
 	return Key{}, ErrNotExist
@@ -261,28 +284,32 @@ func (k Key) ReadSubKeyNames(n int) ([]string, error) {
 		n = max
 	}
 
-	names := make([]string, n)
-	j := 0
-	for i := 0; i < n; i++ {
-		el := list.elements[j]
-		err := el.ReadElement(k.nk.readSeeker)
-		if err != nil {
-			return nil, err
-		}
-		if el.namedKey != nil { // current element is a named key
-			names[i] = el.namedKey.name
-		} else if el.subKeyList != nil { // current element is a subkey list
-			el.subKeyList.readSeeker = k.nk.readSeeker
-			n, err := el.subKeyList.subkeyNames(n - i)
-			if err != nil {
-				return nil, err
-			}
-			for _, v := range n { // add received subkeys
-				names[i] = v
-				i++
-			}
-		}
-		j++
+	// names := make([]string, n)
+	// j := 0
+	// for i := 0; i < n; i++ {
+	// 	el := list.elements[j]
+	// 	err := el.ReadElement()
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	if el.namedKey != nil { // current element is a named key
+	// 		names[i] = el.namedKey.name
+	// 	} else if el.subKeyList != nil { // current element is a subkey list
+	// 		el.subKeyList.rws = k.nk.rws
+	// 		n, err := el.subKeyList.subkeyNames(n - i)
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		for _, v := range n { // add received subkeys
+	// 			names[i] = v
+	// 			i++
+	// 		}
+	// 	}
+	// 	j++
+	// }
+	names, err := list.subkeyNames(n)
+	if err != nil {
+		return nil, err
 	}
 	sort.Strings(names)
 	return names, nil
@@ -292,12 +319,13 @@ func (k Key) subkeys() (*subKeyList, error) {
 	if k.registry.header == nil {
 		return nil, fmt.Errorf("Nil pointers")
 	}
-	fp := k.registry.header.fp
 
-	fp.Seek(k.nk.binOffset+int64(k.nk.subKeysListOffset), 0)
-
-	list := &subKeyList{binOffset: k.nk.binOffset, readSeeker: k.nk.readSeeker}
-	return list, list.Read(fp)
+	list := newSubKeyList(
+		k.rws,
+		k.nk.binOffset,
+		k.nk.binOffset+int64(k.nk.subKeysListOffset),
+	)
+	return list, list.Read()
 }
 
 // ReadValueNames returns the value names of key k.

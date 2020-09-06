@@ -7,9 +7,20 @@ import (
 )
 
 type bin struct {
+	rws io.ReadWriteSeeker
+
 	offset int64
 	header *binHeader
 	cell   *binCell
+}
+
+func newBin(r io.ReadWriteSeeker, offset int64) bin {
+	return bin{
+		rws:    r,
+		header: &binHeader{size: 4},
+		cell:   &binCell{rws: r, binOffset: offset},
+		offset: offset,
+	}
 }
 
 type binHeader struct {
@@ -30,41 +41,48 @@ func (bh *binHeader) Validate(header []byte) error {
 }
 
 type binCell struct {
+	binOffset int64
+	rws       io.ReadWriteSeeker
+
 	size int32
 	data interface{}
 }
 
-func (c *binCell) String() string {
-	return fmt.Sprintf("{size: %d; data: %+v}", c.size, c.data)
-}
+func (c *binCell) Read() error {
+	rws := c.rws
 
-func (c *binCell) Read(r io.ReadSeeker) error {
-	err := binary.Read(r, binary.LittleEndian, &c.size)
+	err := binary.Read(rws, binary.LittleEndian, &c.size)
+	if err != nil {
+		return err
+	}
 
 	var signature [2]byte
-	_, err = r.Read(signature[:])
+	_, err = rws.Read(signature[:])
 	if err != nil {
 		return err
 	}
 
-	_, err = r.Seek(-2, 1)
+	_, err = rws.Seek(-2, 1)
 	if err != nil {
 		return err
 	}
 
-	offset, _ := r.Seek(0, 1)
-	switch string(signature[:]) {
+	offset, _ := rws.Seek(0, 1)
+	sig := string(signature[:])
+	switch sig {
 	case "nk":
-		nk := &namedKey{fpOffset: offset}
+		nk := newNamedKey(rws, int64(c.binOffset), offset)
 		c.data = nk
-		err = nk.Read(r)
+		err = nk.Read()
+	default:
+		return fmt.Errorf("Cell with %v not supported yet", sig)
 	}
 
 	return err
 }
 
-func getHiveBins(fp io.ReadSeeker) ([]bin, error) {
-	_, err := fp.Seek(4096, 0) // goto end of registry header
+func getHiveBins(rs io.ReadWriteSeeker) ([]bin, error) {
+	_, err := rs.Seek(4096, 0) // goto end of registry header
 	if err != nil {
 		return nil, err
 	}
@@ -73,10 +91,10 @@ func getHiveBins(fp io.ReadSeeker) ([]bin, error) {
 	bins := make([]bin, 0)
 
 	// for size == 1 {
-	offset, _ := fp.Seek(0, 1)
-	b := bin{header: &binHeader{size: 4}, cell: &binCell{}, offset: offset}
+	offset, _ := rs.Seek(0, 1)
+	b := newBin(rs, offset)
 	header := make([]byte, 32)
-	_, err = fp.Read(header)
+	_, err = rs.Read(header)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +104,7 @@ func getHiveBins(fp io.ReadSeeker) ([]bin, error) {
 		return nil, err
 	}
 
-	err = b.cell.Read(fp)
+	err = b.cell.Read()
 	if err != nil {
 		return nil, err
 	}

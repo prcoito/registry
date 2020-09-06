@@ -1,8 +1,23 @@
 package registry
 
 import (
+	"io"
 	"os"
 )
+
+// Registry struct
+type Registry struct {
+	fp  *os.File // set if Open/OpenKey
+	rws io.ReadWriteSeeker
+
+	header *header
+
+	root *namedKey
+
+	hiveBins []bin
+
+	createdByOpenKey bool
+}
 
 // Open opens a registry file
 func Open(f string) (Registry, error) {
@@ -11,7 +26,7 @@ func Open(f string) (Registry, error) {
 		return Registry{}, err
 	}
 
-	h := &header{fp: fp}
+	h := newHeader(fp)
 
 	err = h.Read()
 	if err != nil {
@@ -37,18 +52,9 @@ func Open(f string) (Registry, error) {
 		header:   h,
 		hiveBins: bins,
 		root:     root,
+		fp:       fp,
+		rws:      fp,
 	}, nil
-}
-
-// Registry struct
-type Registry struct {
-	header *header
-
-	root *namedKey
-
-	hiveBins []bin
-
-	createdByOpenKey bool
 }
 
 // OpenKey opens a new key in file located at path
@@ -64,7 +70,7 @@ func OpenKey(file, path string) (Key, error) {
 // OpenKey opens a new key located at path
 // If path is empty, it is returned the root key
 func (r Registry) OpenKey(path string) (Key, error) {
-	k := Key{registry: r, nk: r.root}
+	k := newKey(r, r.rws, r.root)
 	if path == "" {
 		return k, nil
 	}
@@ -73,8 +79,8 @@ func (r Registry) OpenKey(path string) (Key, error) {
 
 // Close closes registry file
 func (r Registry) Close() error {
-	if r.header != nil && r.header.fp != nil {
-		return r.header.fp.Close()
+	if r.fp != nil {
+		return r.fp.Close()
 	}
 	return nil
 }

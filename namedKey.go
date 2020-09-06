@@ -6,9 +6,9 @@ import (
 )
 
 type namedKey struct {
-	binOffset  int64
-	fpOffset   int64
-	readSeeker io.ReadSeeker
+	binOffset int64
+	fpOffset  int64
+	rws       io.ReadWriteSeeker
 
 	signature string // must be equal to "nk"
 	flags     uint16
@@ -41,7 +41,15 @@ type namedKey struct {
 
 	headerSize int64
 
-	values valueList
+	values *valueList
+}
+
+func newNamedKey(rws io.ReadWriteSeeker, binOffset int64, fpOffset int64) *namedKey {
+	return &namedKey{
+		rws:       rws,
+		binOffset: binOffset,
+		fpOffset:  fpOffset,
+	}
 }
 
 func (nk *namedKey) validate() error {
@@ -52,12 +60,15 @@ func (nk *namedKey) validate() error {
 	return nil
 }
 
-func (nk *namedKey) Read(r io.ReadSeeker) error {
-	nk.readSeeker = r
-	nk.fpOffset, _ = r.Seek(0, 1)
+func (nk *namedKey) Read() error {
+	r := nk.rws
+	_, err := r.Seek(nk.fpOffset, 0)
+	if err != nil {
+		return err
+	}
 
 	buf := make([]byte, 76)
-	_, err := r.Read(buf)
+	_, err = r.Read(buf)
 	if err != nil {
 		return err
 	}
@@ -103,7 +114,7 @@ func (nk *namedKey) Read(r io.ReadSeeker) error {
 
 	nk.headerSize = int64(4096)
 
-	nk.values.nk = nk
+	nk.values = newValueList(r, nk.binOffset, nk.valuesListOffset, nk.numberOfValues)
 	err = nk.values.Read()
 	if err != nil {
 		return err

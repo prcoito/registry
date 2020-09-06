@@ -3,12 +3,12 @@ package registry
 import (
 	"bytes"
 	"encoding/binary"
-	"os"
+	"io"
 )
 
 // file header
 type header struct {
-	fp *os.File
+	rws io.ReadWriteSeeker
 
 	buf []byte
 
@@ -25,14 +25,18 @@ type header struct {
 	binSize uint32
 
 	xor []byte
+}
 
-	registry *Registry
+func newHeader(rws io.ReadWriteSeeker) *header {
+	return &header{
+		rws: rws,
+	}
 }
 
 func (h *header) Read() error {
 	h.buf = make([]byte, 4096)
 
-	n, err := h.fp.Read(h.buf)
+	n, err := h.rws.Read(h.buf)
 	if n < 4096 || err != nil {
 		return ErrBadRegistry
 	}

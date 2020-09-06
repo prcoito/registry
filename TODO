@@ -1,4 +1,3 @@
-new* functions for struct creation
-multiple hive bins (getHiveBins)
+multiple hive bins (getHiveBins) support
 error handling in Read and Seeks
-add readseeker to each struct to remove need to pass readseeker to Read functions
+REG_DWORD_BIG_ENDIAN support
