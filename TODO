@@ -1,0 +1,4 @@
+new* functions for struct creation
+multiple hive bins (getHiveBins)
+error handling in Read and Seeks
+add readseeker to each struct to remove need to pass readseeker to Read functions
