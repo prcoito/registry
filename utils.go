@@ -45,7 +45,9 @@ func uint64FromBytesLE(u []byte) uint64 {
 
 func uint32FromBytesBE(u []byte) uint32 {
 	b := make([]byte, 4) // make sure b is uint32
-	copy(b, u)
+	for i, v := range u {
+		b[4-len(u)+i] = v
+	}
 	return binary.BigEndian.Uint32(b)
 }
 
