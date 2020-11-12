@@ -28,7 +28,7 @@ func newKey(r Registry, rws io.ReadWriteSeeker, nk *namedKey) Key {
 // OpenSubKey opens the subkey located at path
 func (k Key) OpenSubKey(path string) (Key, error) {
 	if k.nk.numberOfSubKeys == 0 {
-		return Key{}, fmt.Errorf("Key %s does not have subkeys", k.nk.name)
+		return Key{}, ErrNotExist
 	}
 
 	path = strings.Trim(path, string(separator))
@@ -234,9 +234,11 @@ func (k Key) GetValue(name string, buf []byte) (n int, valtype uint32, err error
 		return
 	}
 	switch v.data.(type) {
-	case string, []byte:
+	case []byte:
 		// REVIEW: should string be converted to UTF-16LE ?
 		n = copy(buf, v.data.([]byte))
+	case string:
+		n = copy(buf, v.data.(string))
 	case uint64:
 		var b []byte
 		if v.dataType == REG_DWORD_BIG_ENDIAN {
@@ -284,29 +286,6 @@ func (k Key) ReadSubKeyNames(n int) ([]string, error) {
 		n = max
 	}
 
-	// names := make([]string, n)
-	// j := 0
-	// for i := 0; i < n; i++ {
-	// 	el := list.elements[j]
-	// 	err := el.ReadElement()
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	if el.namedKey != nil { // current element is a named key
-	// 		names[i] = el.namedKey.name
-	// 	} else if el.subKeyList != nil { // current element is a subkey list
-	// 		el.subKeyList.rws = k.nk.rws
-	// 		n, err := el.subKeyList.subkeyNames(n - i)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		for _, v := range n { // add received subkeys
-	// 			names[i] = v
-	// 			i++
-	// 		}
-	// 	}
-	// 	j++
-	// }
 	names, err := list.subkeyNames(n)
 	if err != nil {
 		return nil, err

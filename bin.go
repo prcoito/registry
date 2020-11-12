@@ -30,8 +30,11 @@ type binHeader struct {
 }
 
 func (bh *binHeader) Validate(header []byte) error {
-	if string(header[:4]) != binHeaderSig || len(header) != 32 {
-		return ErrInvalidBinHeader
+	if string(header[:4]) != binHeaderSig {
+		return errBadSignature
+	}
+	if len(header) != 32 {
+		return errInvalidBinHeader
 	}
 
 	bh.hiveOffset = binary.LittleEndian.Uint32(header[4:8])
@@ -57,17 +60,17 @@ func (c *binCell) Read() error {
 	}
 
 	var signature [2]byte
-	_, err = rws.Read(signature[:])
+	_, err = io.ReadFull(rws, signature[:])
 	if err != nil {
 		return err
 	}
 
-	_, err = rws.Seek(-2, 1)
+	_, err = rws.Seek(-2, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
 
-	offset, _ := rws.Seek(0, 1)
+	offset, _ := rws.Seek(0, io.SeekCurrent)
 	sig := string(signature[:])
 	switch sig {
 	case "nk":
@@ -81,8 +84,10 @@ func (c *binCell) Read() error {
 	return err
 }
 
+// TODO: this only gets the first bin
+// Either create a new "getRootBin" function or fix this
 func getHiveBins(rs io.ReadWriteSeeker) ([]bin, error) {
-	_, err := rs.Seek(4096, 0) // goto end of registry header
+	_, err := rs.Seek(4096, io.SeekStart) // goto end of registry header
 	if err != nil {
 		return nil, err
 	}
@@ -91,10 +96,10 @@ func getHiveBins(rs io.ReadWriteSeeker) ([]bin, error) {
 	bins := make([]bin, 0)
 
 	// for size == 1 {
-	offset, _ := rs.Seek(0, 1)
+	offset, _ := rs.Seek(0, io.SeekCurrent)
 	b := newBin(rs, offset)
 	header := make([]byte, 32)
-	_, err = rs.Read(header)
+	_, err = io.ReadFull(rs, header)
 	if err != nil {
 		return nil, err
 	}

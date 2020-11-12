@@ -54,7 +54,7 @@ func newNamedKey(rws io.ReadWriteSeeker, binOffset int64, fpOffset int64) *named
 
 func (nk *namedKey) validate() error {
 	if nk.signature != namedKeySig {
-		return ErrBadSignature
+		return errorW{err: ErrCorruptRegistry, cause: errBadSignature, function: "namedKey.validate()"}
 	}
 
 	return nil
@@ -62,15 +62,15 @@ func (nk *namedKey) validate() error {
 
 func (nk *namedKey) Read() error {
 	r := nk.rws
-	_, err := r.Seek(nk.fpOffset, 0)
+	_, err := r.Seek(nk.fpOffset, io.SeekStart)
 	if err != nil {
-		return err
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "namedKey.Read() r.Seek"}
 	}
 
 	buf := make([]byte, 76)
-	_, err = r.Read(buf)
+	_, err = io.ReadFull(r, buf)
 	if err != nil {
-		return err
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "namedKey.Read() io.ReadFull"}
 	}
 
 	nk.signature = string(buf[0:2])
@@ -93,22 +93,22 @@ func (nk *namedKey) Read() error {
 	nk.classNameSize = binary.LittleEndian.Uint16(buf[74:76])
 
 	buf = make([]byte, nk.keyNameSize)
-	_, err = r.Read(buf)
+	_, err = io.ReadFull(r, buf)
 	if err != nil {
-		return err
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "namedKey.Read() io.ReadFull"}
 	}
 	nk.name = string(buf)
 
-	loc, err := r.Seek(0, 1)
+	loc, err := r.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return err
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "namedKey.Read() r.Seek"}
 	}
 
 	// seek to end of padding
 	for loc%8 != 0 {
-		loc, err = r.Seek(1, 1)
+		loc, err = r.Seek(1, io.SeekCurrent)
 		if err != nil {
-			return err
+			return errorW{err: ErrCorruptRegistry, cause: err, function: "namedKey.Read() r.Seek"}
 		}
 	}
 

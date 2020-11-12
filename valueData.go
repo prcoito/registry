@@ -11,7 +11,7 @@ type valueData struct {
 
 func (vd valueData) validate() error {
 	if vd.signature != dataBlockSig {
-		return ErrBadSignature
+		return errorW{err: ErrCorruptRegistry, cause: errBadSignature, function: "valueData.validate()"}
 	}
 
 	return nil

@@ -32,7 +32,7 @@ func (skl *subKeyList) validate() error {
 		skl.signature == subKeyList2Sig ||
 		skl.signature == subKeyList3Sig ||
 		skl.signature == subKeyList4Sig) {
-		return ErrBadSignature
+		return errorW{err: ErrCorruptRegistry, cause: errBadSignature, function: "subKeyList.validate()"}
 	}
 
 	return nil
@@ -41,21 +41,21 @@ func (skl *subKeyList) validate() error {
 func (skl *subKeyList) Read() (err error) {
 	r := skl.rws
 
-	_, err = r.Seek(skl.fpOffset, 0)
+	_, err = r.Seek(skl.fpOffset, io.SeekStart)
 	if err != nil {
-		return err
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "subKeyList.Read() r.Seek"}
 	}
 
 	b := make([]byte, 2)
-	_, err = r.Read(b)
+	_, err = io.ReadFull(r, b)
 	if err != nil {
-		return err
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "subKeyList.Read() io.ReadFull"}
 	}
 	skl.signature = string(b)
 
-	_, err = r.Read(b)
+	_, err = io.ReadFull(r, b)
 	if err != nil {
-		return err
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "subKeyList.Read() io.ReadFull"}
 	}
 
 	skl.numberElements = binary.LittleEndian.Uint16(b)
@@ -156,17 +156,17 @@ func (el *subKeyElement) Read() error {
 	r := el.rws
 
 	buf := make([]byte, 4)
-	_, err := r.Read(buf)
+	_, err := io.ReadFull(r, buf)
 	if err != nil {
-		return err
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "subKeyElement.Read() io.ReadFull"}
 	}
 
 	switch el.signature {
 	case "lf", "lh":
 		el.namedKeyOffset = binary.LittleEndian.Uint32(buf)
-		_, err := r.Read(buf)
+		_, err := io.ReadFull(r, buf)
 		if err != nil {
-			return err
+			return errorW{err: ErrCorruptRegistry, cause: err, function: "subKeyElement.Read() io.ReadFull"}
 		}
 		el.hashValue = binary.LittleEndian.Uint32(buf)
 	case "li":
@@ -174,7 +174,7 @@ func (el *subKeyElement) Read() error {
 	case "ri":
 		el.subKeyListOffset = binary.LittleEndian.Uint32(buf)
 	}
-	// fmt.Printf("subKeyElement: %+v\n", el)
+
 	return nil
 }
 
@@ -192,7 +192,7 @@ func (el *subKeyElement) ReadElement() error {
 		}
 		hash := lhSubKeyHash(el.namedKey.name)
 		if hash != el.hashValue {
-			return errors.New("Element hash invalid")
+			return errorW{err: ErrCorruptRegistry, cause: errInvalidHash, function: "subKeyElement.ReadElement() hash comparision"}
 		}
 	case "ri":
 		el.subKeyList = newSubKeyList(

@@ -30,12 +30,12 @@ func Open(f string) (Registry, error) {
 
 	err = h.Read()
 	if err != nil {
-		return Registry{}, err
+		return Registry{}, errorW{function: "Open h.Read", err: ErrBadRegistry, cause: err}
 	}
 
 	bins, err := getHiveBins(fp)
 	if err != nil {
-		return Registry{}, err
+		return Registry{}, errorW{function: "Open getHiveBins", err: ErrBadRegistry, cause: err}
 	}
 
 	var root *namedKey
@@ -46,6 +46,10 @@ func Open(f string) (Registry, error) {
 			root.binOffset = bin.offset + int64(bin.header.size)
 			break
 		}
+	}
+
+	if root == nil {
+		return Registry{}, errorW{function: "Open findRoot", err: ErrBadRegistry, cause: errRootNotFound}
 	}
 
 	return Registry{

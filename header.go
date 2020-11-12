@@ -36,9 +36,9 @@ func newHeader(rws io.ReadWriteSeeker) *header {
 func (h *header) Read() error {
 	h.buf = make([]byte, 4096)
 
-	n, err := h.rws.Read(h.buf)
-	if n < 4096 || err != nil {
-		return ErrBadRegistry
+	_, err := io.ReadFull(h.rws, h.buf)
+	if err != nil {
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "header.Read() io.ReadFull"}
 	}
 
 	h.lastModification = binary.LittleEndian.Uint64(h.buf[12:20])
@@ -64,11 +64,11 @@ func (h *header) Read() error {
 func (h *header) validate() error {
 	// header magic number
 	if string(h.buf[:4]) != registrySig {
-		return ErrBadRegistry
+		return errBadSignature
 	}
 
 	if binary.LittleEndian.Uint32(h.buf[4:8]) != binary.LittleEndian.Uint32(h.buf[8:12]) {
-		return ErrBadSequenceNumber
+		return errBadSequenceNumber
 	}
 
 	// calculate xor from previous bytes
@@ -78,7 +78,7 @@ func (h *header) validate() error {
 	}
 
 	if bytes.Compare(calculatedXOR, h.xor) != 0 {
-		return ErrInvalidXOR
+		return errInvalidXOR
 	}
 
 	return nil

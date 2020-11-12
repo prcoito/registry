@@ -14,7 +14,7 @@ type securityKey struct {
 
 func (sk securityKey) validate() error {
 	if sk.signature != securityKeySig {
-		return ErrBadSignature
+		return errorW{err: ErrCorruptRegistry, cause: errBadSignature, function: "securityKey.validate()"}
 	}
 
 	return nil

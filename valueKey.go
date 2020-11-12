@@ -45,14 +45,14 @@ func newValueKey(rws io.ReadWriteSeeker, binOffset int64, valueOffset uint32) *v
 func (vk *valueKey) Read() error {
 	r := vk.rws
 
-	_, err := r.Seek(vk.binOffset+int64(vk.valueOffset), 0)
+	_, err := r.Seek(vk.binOffset+int64(vk.valueOffset), io.SeekStart)
 	if err != nil {
-		return err
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "valueKey.Read() r.Seek"}
 	}
 	b := make([]byte, 20)
-	_, err = r.Read(b)
+	_, err = io.ReadFull(r, b)
 	if err != nil {
-		return err
+		return errorW{err: ErrCorruptRegistry, cause: err, function: "valueKey.Read() io.ReadFull"}
 	}
 
 	vk.signature = string(b[:2])
@@ -69,9 +69,9 @@ func (vk *valueKey) Read() error {
 		vk.name = "(default)"
 	} else {
 		b = make([]byte, vk.nameSize)
-		_, err = r.Read(b)
+		_, err := io.ReadFull(r, b)
 		if err != nil {
-			return err
+			return errorW{err: ErrCorruptRegistry, cause: err, function: "valueKey.Read() io.ReadFull"}
 		}
 		vk.name = string(b)
 	}
@@ -95,11 +95,14 @@ func (vk *valueKey) Read() error {
 			vk.dataSize = 4
 		}
 	} else {
-		r.Seek(vk.binOffset+int64(vk.dataOffset), 0)
-		b = make([]byte, vk.dataSize)
-		_, err = r.Read(b)
+		_, err = r.Seek(vk.binOffset+int64(vk.dataOffset), io.SeekStart)
 		if err != nil {
-			return err
+			return errorW{err: ErrCorruptRegistry, cause: err, function: "valueKey.Read() r.Seek"}
+		}
+		b = make([]byte, vk.dataSize)
+		_, err := io.ReadFull(r, b)
+		if err != nil {
+			return errorW{err: ErrCorruptRegistry, cause: err, function: "valueKey.Read() io.ReadFull"}
 		}
 		vk.data = b[:]
 	}
@@ -109,12 +112,14 @@ func (vk *valueKey) Read() error {
 		case REG_BINARY: // already []byte
 		case REG_SZ, REG_EXPAND_SZ:
 			vk.data = stringFromBytes(vk.data.([]byte))
+			vk.dataSize = (vk.dataSize - 1) / 2 // 2 byte char to 1 byte char excluding \0
 		case REG_DWORD, REG_QWORD:
 			vk.data = uint64FromBytesLE(vk.data.([]byte))
 		case REG_DWORD_BIG_ENDIAN:
 			vk.data = uint32FromBytesBE(vk.data.([]byte))
 		case REG_MULTI_SZ:
 			vk.data = stringsFromBytes(vk.data.([]byte))
+			vk.dataSize = (vk.dataSize - 1) / 2 // 2 byte char to 1 byte char excluding \0
 		default:
 			return fmt.Errorf("Data type %v not supported yet", Type(vk.dataType))
 		}
@@ -125,7 +130,7 @@ func (vk *valueKey) Read() error {
 
 func (vk *valueKey) validate() error {
 	if vk.signature != valueKeySig {
-		return ErrBadSignature
+		return errorW{err: ErrCorruptRegistry, cause: errBadSignature, function: "valueKey.validate()"}
 	}
 
 	return nil
