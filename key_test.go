@@ -19,10 +19,9 @@ func TestKey_ReadSubKeyNames(t *testing.T) {
 		want    []string
 		wantErr bool
 	}{
-		{name: "testdata/SOFTWARE", args: args{filename: "testdata/SOFTWARE", path: "", n: -1}, want: []string{"7-Zip", "Classes", "Clients", "DefaultUserEnvironment", "Docker Inc.", "GitForWindows", "Google", "Intel", "Macromedia", "Microsoft", "MozillaPlugins", "ODBC", "OEM", "OpenSSH", "Oracle", "Partner", "Policies", "RegisteredApplications", "VMware, Inc.", "WOW6432Node"}},
-		{name: "testdata/SOFTWARE", args: args{filename: "testdata/SOFTWARE", path: "", n: 1}, want: []string{"7-Zip"}},
-		{name: "testdata/SOFTWARE", args: args{filename: "testdata/SOFTWARE", path: "", n: 5}, want: []string{"7-Zip", "Classes", "Clients", "DefaultUserEnvironment", "Docker Inc."}},
-		{name: "testdata/SOFTWARE", args: args{filename: "testdata/SOFTWARE", path: "", n: 100}, want: []string{"7-Zip", "Classes", "Clients", "DefaultUserEnvironment", "Docker Inc.", "GitForWindows", "Google", "Intel", "Macromedia", "Microsoft", "MozillaPlugins", "ODBC", "OEM", "OpenSSH", "Oracle", "Partner", "Policies", "RegisteredApplications", "VMware, Inc.", "WOW6432Node"}},
+		{name: "testdata/NTUSER.DAT", args: args{filename: "testdata/NTUSER.DAT", path: "SOFTWARE", n: -1}, want: []string{"Google", "Microsoft", "Policies"}},
+		{name: "testdata/NTUSER.DAT", args: args{filename: "testdata/NTUSER.DAT", path: "SOFTWARE", n: 1}, want: []string{"Google"}},
+		{name: "testdata/NTUSER.DAT", args: args{filename: "testdata/NTUSER.DAT", path: "SOFTWARE", n: 100}, want: []string{"Google", "Microsoft", "Policies"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -59,9 +58,10 @@ func TestKey_ReadValueNames(t *testing.T) {
 		want    []string
 		wantErr bool
 	}{
-		{name: "testdata/SOFTWARE 7-Zip", args: args{filename: "testdata/SOFTWARE", path: "7-Zip", n: -1}, want: []string{"Path", "Path64"}},
-		{name: "testdata/SOFTWARE 7-Zip", args: args{filename: "testdata/SOFTWARE", path: "7-Zip", n: 1}, want: []string{"Path64"}},
-		{name: "testdata/SOFTWARE 7-Zip", args: args{filename: "testdata/SOFTWARE", path: "7-Zip", n: 5}, want: []string{"Path", "Path64"}},
+		{name: `testdata/NTUSER.DAT SOFTWARE\Microsoft\CTF\Assemblies\0x00000816\{34745C63-B2F0-4784-8B67-5E12C8701A31}`, args: args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Microsoft\CTF\Assemblies\0x00000816\{34745C63-B2F0-4784-8B67-5E12C8701A31}`, n: -1}, want: []string{"Default", "KeyboardLayout", "Profile"}},
+		{name: `testdata/NTUSER.DAT SOFTWARE\Microsoft\CTF\Assemblies\0x00000816\{34745C63-B2F0-4784-8B67-5E12C8701A31}`, args: args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Microsoft\CTF\Assemblies\0x00000816\{34745C63-B2F0-4784-8B67-5E12C8701A31}`, n: 1}, want: []string{"Default"}},
+		{name: `testdata/NTUSER.DAT SOFTWARE\Microsoft\CTF\Assemblies\0x00000816\{34745C63-B2F0-4784-8B67-5E12C8701A31}`, args: args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Microsoft\CTF\Assemblies\0x00000816\{34745C63-B2F0-4784-8B67-5E12C8701A31}`, n: 5}, want: []string{"Default", "KeyboardLayout", "Profile"}},
+		{name: `testdata/NTUSER.DAT`, args: args{filename: "testdata/NTUSER.DAT", path: ``, n: 5}, want: []string{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -98,12 +98,9 @@ func TestKey_GetStringValue(t *testing.T) {
 		wantErr     bool
 		err         error
 	}{
-		{name: "testdata/SOFTWARE 7-Zip", args: args{filename: "testdata/SOFTWARE", path: "7-Zip", valuename: "Path"}, wantVal: `C:\Program Files\7-Zip\`, wantValtype: REG_SZ},
-		{name: "testdata/SOFTWARE Puppet Labs\\Puppet", args: args{filename: "testdata/SOFTWARE", path: "WOW6432Node\\Puppet Labs\\Puppet", valuename: "RememberedInstallDir64"}, wantVal: `C:\Program Files\Puppet Labs\Puppet\`, wantValtype: REG_SZ},
-		{name: "testdata/SOFTWARE WOW6432Node\\Runtime Software\\ShadowCopy", args: args{filename: "testdata/SOFTWARE", path: "WOW6432Node\\Runtime Software\\ShadowCopy", valuename: "Version"}, wantVal: `2.02.000`, wantValtype: REG_SZ},
-		{name: `testdata/SOFTWARE WOW6432Node\Puppet Labs\PuppetInstaller RememberedPuppetAgentStartupMode`, args: args{filename: "testdata/SOFTWARE", path: `WOW6432Node\Puppet Labs\PuppetInstaller`, valuename: "RememberedPuppetAgentStartupMode"}, wantVal: "", wantValtype: REG_SZ},
-		{name: `testdata/SOFTWARE WOW6432Node\ODBC\ODBCINST.INI\SQL Server Setup`, args: args{filename: "testdata/SOFTWARE", path: `WOW6432Node\ODBC\ODBCINST.INI\SQL Server`, valuename: "Setup"}, wantVal: `%WINDIR%\system32\sqlsrv32.dll`, wantValtype: REG_EXPAND_SZ},
-		{name: `testdata/SOFTWARE Classes\*\shell\UpdateEncryptionSettingsWork AttributeMask`, args: args{filename: "testdata/SOFTWARE", path: `Classes\*\shell\UpdateEncryptionSettingsWork`, valuename: "AttributeMask"}, wantValtype: REG_DWORD_LITTLE_ENDIAN, wantErr: true, err: ErrUnexpectedType},
+		{name: `testdata/NTUSER.DAT SOFTWARE\Google\Chrome\NativeMessagingHosts\com.microsoft.browsercore`, args: args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Google\Chrome\NativeMessagingHosts\com.microsoft.browsercore`, valuename: "(default)"}, wantVal: `C:\Program Files\Windows Security\BrowserCore\manifest.json`, wantValtype: REG_SZ},
+		{name: `testdata/NTUSER.DAT Environment`, args: args{filename: "testdata/NTUSER.DAT", path: `Environment`, valuename: "Path"}, wantVal: `%USERPROFILE%\AppData\Local\Microsoft\WindowsApps;`, wantValtype: REG_EXPAND_SZ},
+		{name: `testdata/NTUSER.DAT Control Panel\PowerCfg\PowerPolicies\5 Policies`, args: args{filename: "testdata/NTUSER.DAT", path: `Control Panel\PowerCfg\PowerPolicies\5`, valuename: "Policies"}, wantValtype: REG_BINARY, wantErr: true, err: ErrUnexpectedType},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -143,11 +140,10 @@ func TestKey_GetIntegerValue(t *testing.T) {
 		wantErr     bool
 		err         error
 	}{
-		{name: `testdata/SOFTWARE Classes\*\shell\UpdateEncryptionSettingsWork AttributeMask`, args: args{filename: "testdata/SOFTWARE", path: `Classes\*\shell\UpdateEncryptionSettingsWork`, valuename: "AttributeMask"}, wantVal: 8192, wantValtype: REG_DWORD_LITTLE_ENDIAN},
-		{name: `testdata/SOFTWARE Classes\*\shell\UpdateEncryptionSettingsWork ImpliedSelectionModel`, args: args{filename: "testdata/SOFTWARE", path: `Classes\*\shell\UpdateEncryptionSettingsWork`, valuename: "ImpliedSelectionModel"}, wantVal: 0, wantValtype: REG_DWORD_LITTLE_ENDIAN},
-		{name: `testdata/SOFTWARE Microsoft\.NETFramework\v2.0.50727\NGenService\StateP`, args: args{filename: "testdata/SOFTWARE", path: `Microsoft\.NETFramework\v2.0.50727\NGenService\State`, valuename: "LastSuccess"}, wantVal: 637207470905191361, wantValtype: REG_QWORD},
+		{name: `testdata/NTUSER.DAT SOFTWARE\Microsoft\InputPersonalization`, args: args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Microsoft\InputPersonalization`, valuename: "RestrictImplicitInkCollection"}, wantVal: 0, wantValtype: REG_DWORD_LITTLE_ENDIAN},
+		{name: `testdata/NTUSER.DAT Classes\*\shell\UpdateEncryptionSettingsWork ImpliedSelectionModel`, args: args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Microsoft\InputPersonalization\TrainedDataStore`, valuename: "HarvestContacts"}, wantVal: 1, wantValtype: REG_DWORD_LITTLE_ENDIAN},
 
-		{name: `testdata/SOFTWARE Classes\.3gp\OpenWithProgIds WMP11.AssocFile.3GP`, args: args{filename: "testdata/SOFTWARE", path: `Classes\.3gp\OpenWithProgIds`, valuename: "WMP11.AssocFile.3GP"}, wantErr: true, wantValtype: REG_NONE, err: ErrUnexpectedType},
+		{name: `testdata/NTUSER.DAT Control Panel\PowerCfg\PowerPolicies\5 Policies`, args: args{filename: "testdata/NTUSER.DAT", path: `Control Panel\PowerCfg\PowerPolicies\5`, valuename: "Policies"}, wantValtype: REG_BINARY, wantErr: true, err: ErrUnexpectedType},
 		// TODO: REG_DWORD_BIG_ENDIAN support
 	}
 	for _, tt := range tests {
@@ -188,10 +184,10 @@ func TestKey_GetValue(t *testing.T) {
 		wantValtype uint32
 		wantErr     bool
 	}{
-		{name: `testdata/SOFTWARE WOW6432Node\Microsoft\WSDAPI\Reporting LastUploadTime`, args: args{filename: "testdata/SOFTWARE", path: `WOW6432Node\Microsoft\WSDAPI\Reporting`, valuename: "LastUploadTime"}, wantVal: make([]byte, 28), wantValtype: REG_BINARY, wantN: 28},
-		{name: `testdata/SOFTWARE Classes\*\shell\UpdateEncryptionSettingsWork AttributeMask`, args: args{filename: "testdata/SOFTWARE", path: `Classes\*\shell\UpdateEncryptionSettingsWork`, valuename: "AttributeMask"}, wantVal: []byte{0, 32, 0, 0}, wantValtype: REG_DWORD_LITTLE_ENDIAN, wantN: dataSizeFromType(REG_DWORD_LITTLE_ENDIAN)},
-		{name: `testdata/SOFTWARE Microsoft\Cryptography\OID\EncodingType 0\CryptsvcDllCtrl\DEFAULT`, args: args{filename: "testdata/SOFTWARE", path: `Microsoft\Cryptography\OID\EncodingType 0\CryptsvcDllCtrl\DEFAULT`, valuename: "Dll"}, wantVal: []byte{'C', ':', '\\', 'W', 'i', 'n', 'd', 'o', 'w', 's', '\\', 'S', 'y', 's', 't', 'e', 'm', '3', '2', '\\', 'c', 'r', 'y', 'p', 't', 't', 'p', 'm', 'e', 'k', 's', 'v', 'c', '.', 'd', 'l', 'l', 0, 'C', ':', '\\', 'W', 'i', 'n', 'd', 'o', 'w', 's', '\\', 'S', 'y', 's', 't', 'e', 'm', '3', '2', '\\', 'c', 'r', 'y', 'p', 't', 'c', 'a', 't', 's', 'v', 'c', '.', 'd', 'l', 'l', 0, 'C', ':', '\\', 'W', 'i', 'n', 'd', 'o', 'w', 's', '\\', 'S', 'y', 's', 't', 'e', 'm', '3', '2', '\\', 'w', 'e', 'b', 'a', 'u', 't', 'h', 'n', '.', 'd', 'l', 'l', 0}, wantValtype: REG_MULTI_SZ, wantN: 107},
-		{name: `testdata/SOFTWARE Microsoft\.NETFramework\v2.0.50727\NGenService\StateP`, args: args{filename: "testdata/SOFTWARE", path: `Microsoft\.NETFramework\v2.0.50727\NGenService\State`, valuename: "LastSuccess"}, wantVal: []byte{193, 107, 135, 151, 209, 208, 215, 8}, wantValtype: REG_QWORD, wantN: dataSizeFromType(REG_QWORD)},
+		{name: `testdata/NTUSER.DAT Control Panel\Input Method\Hot Keys\00000010`, args: args{filename: "testdata/NTUSER.DAT", path: `Control Panel\Input Method\Hot Keys\00000010`, valuename: "Key Modifiers"}, wantVal: []byte{'\x02', '\xc0', '\x00', '\x00'}, wantValtype: REG_BINARY, wantN: 4},
+		{name: `testdata/NTUSER.DAT SOFTWARE\Google\Chrome\NativeMessagingHosts\com.microsoft.browsercore`, args: args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Google\Chrome\NativeMessagingHosts\com.microsoft.browsercore`, valuename: "(default)"}, wantVal: []byte(`C:\Program Files\Windows Security\BrowserCore\manifest.json`), wantValtype: REG_SZ, wantN: 59},
+		{name: `testdata/NTUSER.DAT SOFTWARE\Microsoft\InputPersonalization`, args: args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Microsoft\InputPersonalization`, valuename: "RestrictImplicitInkCollection"}, wantVal: []byte{0, 0, 0, 0}, wantValtype: REG_DWORD_LITTLE_ENDIAN, wantN: dataSizeFromType(REG_DWORD_LITTLE_ENDIAN)},
+		{name: `testdata/NTUSER.DAT Control Panel\International\User Profile`, args: args{filename: "testdata/NTUSER.DAT", path: `Control Panel\International\User Profile`, valuename: "Languages"}, wantVal: append([]byte(`pt-PT`), 0), wantValtype: REG_MULTI_SZ, wantN: 6},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -241,67 +237,30 @@ func TestKey_GetValue2(t *testing.T) {
 		err         error
 	}{
 		{
-			name:        `testdata/SOFTWARE WOW6432Node\Microsoft\WSDAPI\Reporting LastUploadTime`,
-			args:        args{filename: "testdata/SOFTWARE", path: `WOW6432Node\Microsoft\WSDAPI\Reporting`, valuename: "LastUploadTime"},
+			name:        `testdata/NTUSER.DAT Control Panel\Input Method\Hot Keys\00000010`,
+			args:        args{filename: "testdata/NTUSER.DAT", path: `Control Panel\Input Method\Hot Keys\00000010`, valuename: "Key Modifiers"},
 			wantValtype: REG_BINARY,
-			wantN:       28,
-		},
-		{
-			name:        `testdata/SOFTWARE Classes\*\shell\UpdateEncryptionSettingsWork AttributeMask`,
-			args:        args{filename: "testdata/SOFTWARE", path: `Classes\*\shell\UpdateEncryptionSettingsWork`, valuename: "AttributeMask", buf: make([]byte, dataSizeFromType(REG_DWORD_LITTLE_ENDIAN))},
-			wantVal:     []byte{0, 32, 0, 0},
-			wantValtype: REG_DWORD_LITTLE_ENDIAN,
-			wantN:       dataSizeFromType(REG_DWORD_LITTLE_ENDIAN),
-		},
-		{
-			name:        `testdata/SOFTWARE Microsoft\Cryptography\OID\EncodingType 0\CryptsvcDllCtrl\DEFAULT no buf`,
-			args:        args{filename: "testdata/SOFTWARE", path: `Microsoft\Cryptography\OID\EncodingType 0\CryptsvcDllCtrl\DEFAULT`, valuename: "Dll"},
-			wantValtype: REG_MULTI_SZ,
-			wantN:       107,
-		},
-		{
-			name:        `testdata/SOFTWARE Microsoft\Cryptography\OID\EncodingType 0\CryptsvcDllCtrl\DEFAULT buf`,
-			args:        args{filename: "testdata/SOFTWARE", path: `Microsoft\Cryptography\OID\EncodingType 0\CryptsvcDllCtrl\DEFAULT`, valuename: "Dll", buf: make([]byte, 107)},
-			wantVal:     []byte{'C', ':', '\\', 'W', 'i', 'n', 'd', 'o', 'w', 's', '\\', 'S', 'y', 's', 't', 'e', 'm', '3', '2', '\\', 'c', 'r', 'y', 'p', 't', 't', 'p', 'm', 'e', 'k', 's', 'v', 'c', '.', 'd', 'l', 'l', 0, 'C', ':', '\\', 'W', 'i', 'n', 'd', 'o', 'w', 's', '\\', 'S', 'y', 's', 't', 'e', 'm', '3', '2', '\\', 'c', 'r', 'y', 'p', 't', 'c', 'a', 't', 's', 'v', 'c', '.', 'd', 'l', 'l', 0, 'C', ':', '\\', 'W', 'i', 'n', 'd', 'o', 'w', 's', '\\', 'S', 'y', 's', 't', 'e', 'm', '3', '2', '\\', 'w', 'e', 'b', 'a', 'u', 't', 'h', 'n', '.', 'd', 'l', 'l', 0},
-			wantValtype: REG_MULTI_SZ,
-			wantN:       107,
-		},
-		{
-			name:        `testdata/SOFTWARE Microsoft\.NETFramework\v2.0.50727\NGenService\StateP`,
-			args:        args{filename: "testdata/SOFTWARE", path: `Microsoft\.NETFramework\v2.0.50727\NGenService\State`, valuename: "LastSuccess", buf: make([]byte, dataSizeFromType(REG_QWORD))},
-			wantVal:     []byte{193, 107, 135, 151, 209, 208, 215, 8},
-			wantValtype: REG_QWORD,
-			wantN:       dataSizeFromType(REG_QWORD),
-		},
-		{
-			name:        `testdata/SOFTWARE Microsoft\.NETFramework\v2.0.50727\NGenService\StateP`,
-			args:        args{filename: "testdata/SOFTWARE", path: `Microsoft\.NETFramework\v2.0.50727\NGenService\State`, valuename: "LastSuccess", buf: make([]byte, 2)},
-			wantVal:     []byte{193, 107, 135, 151, 209, 208, 215, 8},
-			wantValtype: REG_QWORD,
-			wantN:       dataSizeFromType(REG_QWORD),
-			wantErr:     true,
-			err:         ErrShortBuffer,
-		},
-		{
-			name:        `testdata/SOFTWARE Classes\WOW6432Node\CLSID\{0BFCF7B7-E7B6-433a-B205-2904FCF040DD}\InProcServer32`,
-			args:        args{filename: "testdata/SOFTWARE", path: `Classes\WOW6432Node\CLSID\{0BFCF7B7-E7B6-433a-B205-2904FCF040DD}\InProcServer32`, valuename: "(default)", buf: make([]byte, 32)},
-			wantVal:     []byte{'%', 'S', 'y', 's', 't', 'e', 'm', 'R', 'o', 'o', 't', '%', '\\', 'S', 'y', 's', 't', 'e', 'm', '3', '2', '\\', 'a', 'p', 'p', 'w', 'i', 'z', '.', 'c', 'p', 'l'},
-			wantValtype: REG_EXPAND_SZ,
-			wantN:       32,
-		},
-		{
-			name:        `testdata/SOFTWARE Classes\AudioCD EditFlags`,
-			args:        args{filename: "testdata/SOFTWARE", path: `Classes\AudioCD`, valuename: "EditFlags", buf: nil},
-			wantVal:     nil,
 			wantN:       4,
-			wantValtype: REG_BINARY,
 		},
 		{
-			name:        `testdata/SOFTWARE Classes\AudioCD EditFlags`,
-			args:        args{filename: "testdata/SOFTWARE", path: `Classes\AudioCD`, valuename: "EditFlags", buf: make([]byte, 4)},
-			wantVal:     []byte{2, 0, 16, 0},
-			wantN:       4,
+			name:        `testdata/NTUSER.DAT Control Panel\Input Method\Hot Keys\00000010`,
+			args:        args{filename: "testdata/NTUSER.DAT", path: `Control Panel\Input Method\Hot Keys\00000010`, valuename: "Key Modifiers", buf: make([]byte, 4)},
+			wantVal:     []byte{'\x02', '\xc0', '\x00', '\x00'},
 			wantValtype: REG_BINARY,
+			wantN:       4,
+		},
+		{
+			name:        `testdata/NTUSER.DAT SOFTWARE\Google\Chrome\NativeMessagingHosts\com.microsoft.browsercore`,
+			args:        args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Google\Chrome\NativeMessagingHosts\com.microsoft.browsercore`, valuename: "(default)"},
+			wantValtype: REG_SZ,
+			wantN:       59,
+		},
+		{
+			name:        `testdata/NTUSER.DAT excess memory`,
+			args:        args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Google\Chrome\NativeMessagingHosts\com.microsoft.browsercore`, valuename: "(default)", buf: make([]byte, 62)},
+			wantVal:     append([]byte(`C:\Program Files\Windows Security\BrowserCore\manifest.json`), 0, 0, 0),
+			wantValtype: REG_SZ,
+			wantN:       59,
 		},
 	}
 	for _, tt := range tests {
@@ -346,8 +305,8 @@ func TestKey_GetStringsValue(t *testing.T) {
 		wantErr     bool
 		err         error
 	}{
-		{name: `testdata/SOFTWARE Microsoft\Cryptography\OID\EncodingType 0\CryptsvcDllCtrl\DEFAULT`, args: args{filename: "testdata/SOFTWARE", path: `Microsoft\Cryptography\OID\EncodingType 0\CryptsvcDllCtrl\DEFAULT`, valuename: "Dll"}, wantVal: []string{`C:\Windows\System32\crypttpmeksvc.dll`, `C:\Windows\System32\cryptcatsvc.dll`, `C:\Windows\System32\webauthn.dll`}, wantValtype: REG_MULTI_SZ},
-		{name: "testdata/SOFTWARE 7-Zip", args: args{filename: "testdata/SOFTWARE", path: "7-Zip", valuename: "Path"}, wantValtype: REG_SZ, wantErr: true, err: ErrUnexpectedType},
+		{name: `testdata/NTUSER.DAT Control Panel\International\User Profile`, args: args{filename: "testdata/NTUSER.DAT", path: `Control Panel\International\User Profile`, valuename: "Languages"}, wantVal: []string{`pt-PT`}, wantValtype: REG_MULTI_SZ},
+		{name: `testdata/NTUSER.DAT Control Panel\PowerCfg\PowerPolicies\5 Policies`, args: args{filename: "testdata/NTUSER.DAT", path: `Control Panel\PowerCfg\PowerPolicies\5`, valuename: "Policies"}, wantValtype: REG_BINARY, wantErr: true, err: ErrUnexpectedType}, {name: `testdata/NTUSER.DAT Control Panel\PowerCfg\PowerPolicies\5 Policies`, args: args{filename: "testdata/NTUSER.DAT", path: `Control Panel\PowerCfg\PowerPolicies\5`, valuename: "Policies"}, wantValtype: REG_BINARY, wantErr: true, err: ErrUnexpectedType},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -387,8 +346,8 @@ func TestKey_GetBinaryValue(t *testing.T) {
 		wantErr     bool
 		err         error
 	}{
-		{name: `testdata/SOFTWARE WOW6432Node\Microsoft\WSDAPI\Reporting LastUploadTime`, args: args{filename: "testdata/SOFTWARE", path: `WOW6432Node\Microsoft\WSDAPI\Reporting`, valuename: "LastUploadTime"}, wantVal: make([]byte, 28), wantValtype: REG_BINARY},
-		{name: "testdata/SOFTWARE 7-Zip", args: args{filename: "testdata/SOFTWARE", path: "7-Zip", valuename: "Path"}, wantValtype: REG_SZ, wantErr: true, err: ErrUnexpectedType},
+		{name: `testdata/NTUSER.DAT Control Panel\Input Method\Hot Keys\00000010`, args: args{filename: "testdata/NTUSER.DAT", path: `Control Panel\Input Method\Hot Keys\00000010`, valuename: "Key Modifiers"}, wantVal: []byte{'\x02', '\xc0', '\x00', '\x00'}, wantValtype: REG_BINARY},
+		{name: `testdata/NTUSER.DAT Classes\*\shell\UpdateEncryptionSettingsWork ImpliedSelectionModel`, args: args{filename: "testdata/NTUSER.DAT", path: `SOFTWARE\Microsoft\InputPersonalization\TrainedDataStore`, valuename: "HarvestContacts"}, wantValtype: REG_DWORD_LITTLE_ENDIAN, wantErr: true, err: ErrUnexpectedType},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

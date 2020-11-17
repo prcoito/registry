@@ -1,3 +1,1 @@
-multiple hive bins (getHiveBins) support
-error handling in Read and Seeks
-REG_DWORD_BIG_ENDIAN support
+proper REG_DWORD_BIG_ENDIAN support
